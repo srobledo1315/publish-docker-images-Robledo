@@ -1,0 +1,50 @@
+name: Publish Docker Image to GHCR
+
+on:
+  push:
+    branches: [ "main" ]
+  # Ejecuta el flujo al crear un nuevo release (etiqueta)
+  release:
+    types: [published]
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }} # Se traduce a srobledo1315/publish-docker-images-Robledo
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    
+    # Se otorgan explícitamente permisos de escritura en 'packages' para poder subir la imagen a GHCR
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout del código
+        uses: actions/checkout@v4
+
+      # Autenticación automática usando el token temporal que provee GitHub Actions
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # Extrae metadatos para etiquetar la imagen automáticamente (ej. 'latest', 'v1.0.0')
+      - name: Extract metadata (tags, labels)
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+
+      # Construye y sube la imagen usando los metadatos generados en el paso anterior
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+
